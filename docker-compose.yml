@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pr-manager-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pr_manager_bmstu
+      POSTGRES_USER: prmanager
+      POSTGRES_PASSWORD: prmanager
+    ports:
+      - "5432:5432"
+    volumes:
+      - pr_manager_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prmanager -d pr_manager_bmstu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pr_manager_postgres_data:

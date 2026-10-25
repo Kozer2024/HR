@@ -1,0 +1,368 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  EXECUTOR
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum InstallationEventAction {
+  CHECKED
+  UNCHECKED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+}
+
+enum LocationType {
+  POSTER
+  PRISM
+  BANNER
+  TELEVISION
+  LED_DISPLAY
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  name                 String
+  studyGroup           String?
+  email                String                @unique
+  passwordHash         String
+  role                 Role                  @default(ORGANIZER)
+  status               UserStatus            @default(PENDING)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  campaigns            Campaign[]            @relation("CampaignOwner")
+  accounts             Account[]
+  sessions             Session[]
+  bookings             Booking[]
+  tasks                ExecutionTask[]
+  notifications        Notification[]
+  installationComments InstallationComment[] @relation("UserInstallationComments")
+  telegramChatId       String?
+  telegramUsername     String?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Campus {
+  id        String     @id @default(cuid())
+  name      String
+  buildings Building[]
+}
+
+model Building {
+  id        String  @id @default(cuid())
+  name      String
+  sortOrder Int     @default(0)
+  campusId  String
+  campus    Campus  @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  floors    Floor[]
+
+  @@unique([campusId, name])
+  @@index([sortOrder, name])
+}
+
+model Floor {
+  id         String     @id @default(cuid())
+  number     Int
+  buildingId String
+  building   Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  locations  Location[]
+
+  @@unique([buildingId, number])
+}
+
+model Location {
+  id                  String       @id @default(cuid())
+  name                String
+  externalId          String?      @unique
+  dimensions          String?
+  type                LocationType
+  capacity            Int?
+  isUnlimitedCapacity Boolean      @default(false)
+  isActive            Boolean      @default(true)
+  description         String?
+  photoUrls           String[]     @default([])
+  floorId             String
+  floor               Floor        @relation(fields: [floorId], references: [id])
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  bookings            Booking[]
+  screenSlots         ScreenSlot[]
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  status      CampaignStatus @default(DRAFT)
+  ownerId     String
+  owner       User           @relation("CampaignOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  bookings    Booking[]
+}
+
+model Booking {
+  id                     String              @id @default(cuid())
+  bookingGroupId         String?
+  campaignId             String
+  locationId             String
+  requesterId            String
+  startDate              DateTime
+  endDate                DateTime
+  quantity               Int
+  objects                String[]            @default([])
+  productQuantities      Json?
+  comment                String?
+  installationProgress   Int                 @default(0)
+  installationMarkedById String?
+  installationMarkedAt   DateTime?
+  status                 BookingStatus       @default(DRAFT)
+  campaign               Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  location               Location            @relation(fields: [locationId], references: [id])
+  requester              User                @relation(fields: [requesterId], references: [id])
+  installationMarkedBy   Executor?           @relation("ExecutorInstallationMarks", fields: [installationMarkedById], references: [id], onDelete: SetNull)
+  task                   ExecutionTask?
+  screenSlots            BookingScreenSlot[]
+  history                BookingHistory[]
+  installationEvents     InstallationEvent[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  @@index([locationId, startDate, endDate])
+  @@index([bookingGroupId])
+  @@index([installationMarkedById])
+}
+
+model ExecutionTask {
+  id         String                @id @default(cuid())
+  bookingId  String                @unique
+  executorId String
+  status     TaskStatus            @default(TODO)
+  reportUrl  String?
+  comment    String?
+  booking    Booking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  executor   User                  @relation(fields: [executorId], references: [id])
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  comments   InstallationComment[]
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      NotificationType @default(INFO)
+  readAt    DateTime?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+model SiteSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  title       String
+  subtitle    String
+  description String
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminContact {
+  id          String   @id @default(cuid())
+  displayName String
+  role        String
+  telegram    String?
+  extraText   String?
+  sortOrder   Int      @default(0)
+  isPublic    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ScreenSlot {
+  id         String              @id @default(cuid())
+  locationId String
+  startAt    DateTime
+  endAt      DateTime
+  capacity   Int                 @default(1)
+  isActive   Boolean             @default(true)
+  location   Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  bookings   BookingScreenSlot[]
+
+  @@index([locationId, startAt, endAt])
+}
+
+model BookingScreenSlot {
+  id        String     @id @default(cuid())
+  bookingId String
+  slotId    String
+  quantity  Int        @default(1)
+  booking   Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  slot      ScreenSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, slotId])
+}
+
+model BookingHistory {
+  id        String        @id @default(cuid())
+  bookingId String
+  actorId   String?
+  status    BookingStatus
+  comment   String?
+  createdAt DateTime      @default(now())
+  booking   Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+}
+
+model InstallationEvent {
+  id        String                  @id @default(cuid())
+  bookingId String
+  action    InstallationEventAction
+  actorName String
+  actorType String
+  createdAt DateTime                @default(now())
+  booking   Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+}
+
+model InstallationAccessLink {
+  id              String           @id @default(cuid())
+  bookingGroupId  String
+  tokenHash       String           @unique
+  tokenCiphertext String?
+  createdById     String
+  createdAt       DateTime         @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  accesses        ExecutorAccess[]
+
+  @@index([bookingGroupId])
+}
+
+model Executor {
+  id             String                @id @default(cuid())
+  name           String
+  studyGroup     String
+  telegram       String
+  createdAt      DateTime              @default(now())
+  accesses       ExecutorAccess[]
+  comments       InstallationComment[]
+  markedBookings Booking[]             @relation("ExecutorInstallationMarks")
+}
+
+model ExecutorAccess {
+  id         String                 @id @default(cuid())
+  executorId String
+  accessId   String
+  createdAt  DateTime               @default(now())
+  revokedAt  DateTime?
+  executor   Executor               @relation(fields: [executorId], references: [id], onDelete: Cascade)
+  access     InstallationAccessLink @relation(fields: [accessId], references: [id], onDelete: Cascade)
+
+  @@unique([executorId, accessId])
+}
+
+model InstallationComment {
+  id               String        @id @default(cuid())
+  taskId           String
+  authorUserId     String?
+  authorExecutorId String?
+  text             String
+  createdAt        DateTime      @default(now())
+  task             ExecutionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorUser       User?         @relation("UserInstallationComments", fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorExecutor   Executor?     @relation(fields: [authorExecutorId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+}
