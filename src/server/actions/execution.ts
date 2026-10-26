@@ -18,4 +18,16 @@ export async function updateInstallationProgress(bookingId: string, completed: b
 }
 
 export async function assignExecutionTask(formData: FormData) { await requireRole("ADMIN"); const parsed = z.object({ bookingId: z.string().min(1), executorId: z.string().min(1) }).safeParse(Object.fromEntries(formData)); if (!parsed.success) return; await prisma.executionTask.upsert({ where: { bookingId: parsed.data.bookingId }, update: { executorId: parsed.data.executorId, status: "TODO" }, create: { bookingId: parsed.data.bookingId, executorId: parsed.data.executorId } }); revalidatePath("/execution"); }
-export async function updateExecutionTask(taskId: string, status: "IN_PROGRESS" | "SUBMITTED" | "ACCEPTED" | "REJECTED", reportUrl?: string) { const user = await requireUser(); const task = await prisma.executionTask.findUnique({ where: { id: taskId } }); if (!task || (user.role !== "ADMIN" && task.executorId !== user.id)) return; await prisma.executionTask.update({ where: { id: taskId }, data: { status, ...(reportUrl ? { reportUrl } : {}) } }); revalidatePath("/execution"); }
+export async function updateExecutionTask(taskId: string, status: "IN_PROGRESS" | "SUBMITTED" | "ACCEPTED" | "REJECTED") {
+  const user = await requireUser();
+  const parsed = z.object({
+    taskId: z.string().min(1).max(64),
+    status: z.enum(["IN_PROGRESS", "SUBMITTED", "ACCEPTED", "REJECTED"]),
+  }).safeParse({ taskId, status });
+  if (!parsed.success) return { error: "Некорректные данные задачи." };
+  const task = await prisma.executionTask.findUnique({ where: { id: parsed.data.taskId } });
+  if (!task || (user.role !== "ADMIN" && (user.role !== "EXECUTOR" || task.executorId !== user.id || !["IN_PROGRESS", "SUBMITTED"].includes(parsed.data.status)))) return { error: "Нет доступа к этой задаче." };
+  await prisma.executionTask.update({ where: { id: task.id }, data: { status: parsed.data.status } });
+  revalidatePath("/execution");
+  return { success: true };
+}

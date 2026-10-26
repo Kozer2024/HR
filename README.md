@@ -6,14 +6,14 @@
 
 - Next.js 16 (App Router), React 19 и TypeScript;
 - Tailwind CSS 4;
-- PostgreSQL 16 и Prisma 6;
+- PostgreSQL 16 и Prisma 7;
 - Auth.js Credentials, bcrypt и Zod;
 - Docker Compose для локального PostgreSQL.
 
 ## Что нужно для локального запуска
 
 - Windows 10/11, macOS или Linux;
-- Node.js версии 20.9 или новее и npm;
+- Node.js версии 20.19 или новее и npm;
 - Docker Desktop (или Docker Engine с Compose);
 - Git — только если вы клонируете проект или отправляете изменения на GitHub.
 
@@ -86,6 +86,7 @@ npm.cmd run test:smoke
 | `npm.cmd run build` | production-сборка Next.js |
 | `npm.cmd run start` | запуск готовой production-сборки |
 | `npm.cmd run lint` | проверка ESLint |
+| `npm.cmd run test:security` | локальные проверки токенов, загрузок, CSV и проверки Origin |
 | `npm.cmd run db:generate` | генерация Prisma Client |
 | `npx.cmd prisma migrate deploy` | применение существующих миграций |
 | `npm.cmd run db:seed` | создание/обновление администратора и демо-данных |

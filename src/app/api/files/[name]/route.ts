@@ -1,5 +1,5 @@
 import path from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { storageDirectory } from "@/lib/storage";
@@ -12,17 +12,39 @@ function contentType(name: string) {
   return ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".pdf": "application/pdf" } as Record<string, string>)[extension] ?? "application/octet-stream";
 }
 
+function validStoredName(name: string) {
+  return path.basename(name) === name && /^[a-f0-9-]{36}(?:-[a-zA-Z0-9а-яА-Я._-]+)?\.(?:png|jpe?g|webp|gif|pdf)$/i.test(name);
+}
+
 export async function GET(_request: Request, context: { params: Promise<{ name: string }> }) {
-  const session = await auth();
-  const cookieStore = await cookies();
-  const executorAccessId = cookieStore.get("executor_access")?.value;
-  const executorAccess = executorAccessId ? await prisma.executorAccess.findFirst({ where: { id: executorAccessId, revokedAt: null, access: { revokedAt: null, expiresAt: { gt: new Date() } } }, select: { id: true } }) : null;
   const { name } = await context.params;
-  const safeName = path.basename(name);
-  const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(path.extname(safeName).toLowerCase());
-  if (!session?.user && !executorAccess && !isImage) return new Response("Unauthorized", { status: 401 });
+  if (!validStoredName(name)) return new Response("Not found", { status: 404 });
+  const fileUrl = `/api/files/${name}`;
+  const image = /\.(?:png|jpe?g|webp|gif)$/i.test(name);
+  const [session, cookieStore, publicPhoto] = await Promise.all([
+    auth(),
+    cookies(),
+    image ? prisma.location.findFirst({ where: { photoUrls: { has: fileUrl } }, select: { id: true } }) : Promise.resolve(null),
+  ]);
+
+  if (!publicPhoto) {
+    const task = await prisma.executionTask.findFirst({ where: { reportUrl: fileUrl }, select: { executorId: true, booking: { select: { bookingGroupId: true } } } });
+    if (!task?.booking.bookingGroupId) return new Response("Not found", { status: 404 });
+    const ownTask = session?.user?.id === task.executorId;
+    const isAdmin = session?.user?.role === "ADMIN";
+    const accessId = cookieStore.get("executor_access")?.value;
+    const executorAccess = accessId ? await prisma.executorAccess.findFirst({ where: { id: accessId, revokedAt: null, access: { bookingGroupId: task.booking.bookingGroupId, revokedAt: null, expiresAt: { gt: new Date() } } }, select: { id: true } }) : null;
+    if (!ownTask && !isAdmin && !executorAccess) return new Response("Unauthorized", { status: 401 });
+  }
+
   try {
-    const file = await readFile(path.join(storageDirectory, safeName));
-    return new Response(file, { headers: { "Content-Type": contentType(safeName), "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff" } });
-  } catch { return new Response("Not found", { status: 404 }); }
+    const filePath = path.join(storageDirectory, name);
+    const metadata = await stat(filePath);
+    if (!metadata.isFile() || metadata.size > 20 * 1024 * 1024) return new Response("Not found", { status: 404 });
+    const file = await readFile(filePath);
+    const headers = new Headers({ "Content-Type": contentType(name), "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": image ? "inline" : "attachment" });
+    return new Response(file, { headers });
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
 }

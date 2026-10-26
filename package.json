@@ -2,11 +2,16 @@
   "name": "pr-manager-bmstu",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev -p 3001",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "test:security": "tsx --test scripts/security-tests.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
@@ -15,16 +20,19 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/client": "^6.19.0",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.2",
+    "dotenv": "^18.0.9",
     "lucide-react": "^0.468.0",
     "next": "16.4.2",
     "next-auth": "^5.0.0-beta.30",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "xlsx": "^0.18.5",
-    "zod": "^3.24.1"
+    "read-excel-file": "^9.3.12",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -34,7 +42,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
-    "prisma": "^6.19.0",
+    "prisma": "^7.10.1",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
     "typescript": "^5"
