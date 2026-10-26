@@ -258,6 +258,109 @@ html.light-theme .menu-card { background: #080d09; }
 
 /* Red primary accent; preserve the existing layout, textures, and motion. */
 :root { --accent: #f04452; --accent-bright: #ff5b66; --accent-soft: rgba(240, 68, 82, .16); }
+
+/* Keep navigation and page content usable on narrow phone screens. */
+@media (max-width: 640px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .app-header-inner {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .app-brand {
+    min-width: 0;
+  }
+
+  .app-brand-mark {
+    width: 32px;
+    height: 32px;
+    font-size: 23px;
+  }
+
+  .app-brand-name {
+    font-size: 18px;
+  }
+
+  .app-tools {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .app-nav {
+    flex-wrap: wrap;
+    gap: 2px;
+    overflow: visible !important;
+    padding-bottom: 0;
+  }
+
+  .app-nav-link {
+    max-width: 100%;
+    padding: 7px 8px;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  main {
+    width: 100%;
+    min-width: 0;
+    padding: 16px !important;
+  }
+
+  main h1 {
+    font-size: clamp(1.5rem, 7vw, 2rem) !important;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  main h2 {
+    overflow-wrap: anywhere;
+  }
+
+  main input,
+  main select,
+  main textarea,
+  main button {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  main button {
+    white-space: normal;
+  }
+
+  main table {
+    width: 100%;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 11px;
+  }
+
+  main th,
+  main td {
+    padding: 6px !important;
+    overflow-wrap: anywhere;
+  }
+
+  main img,
+  main video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .app-footer {
+    padding: 20px 16px;
+  }
+}
 body {
   background-image:
     radial-gradient(ellipse at 4% 0%, rgba(128, 20, 31, .34), transparent 38rem),

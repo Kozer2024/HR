@@ -63,14 +63,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     return `/calendar?${params.toString()}`;
   };
 
-  return <main className="mx-auto max-w-7xl p-6 md:p-8">
+  return <main className="mx-auto max-w-7xl p-3 sm:p-6 md:p-8">
     <h1 className="text-3xl font-bold">Календарь свободных точек</h1>
     <p className="mt-2 text-slate-300">В каждой дате показано, сколько активных точек свободно. Заявки на согласовании и одобренные считаются занятыми.</p>
     <CalendarFilters month={monthKey(monthStart)} type={type} building={validBuilding ?? ""} floor={validFloor ?? ""} locations={allActiveLocations} allFloors={allFloors} />
 
-    <section className="mt-6 rounded-2xl bg-white p-4 shadow-sm sm:p-6">
-      <div className="mb-5 flex items-center justify-between gap-3"><Link href={queryForMonth(prevMonth)} aria-label="Предыдущий месяц" className="rounded-lg border border-slate-400 px-4 py-2 font-semibold hover:bg-slate-100">←</Link><h2 className="text-center text-xl font-bold capitalize">{monthTitle}</h2><Link href={queryForMonth(nextMonth)} aria-label="Следующий месяц" className="rounded-lg border border-slate-400 px-4 py-2 font-semibold hover:bg-slate-100">→</Link></div>
-      <div className="grid grid-cols-7 gap-1 sm:gap-2">{weekdays.map((day) => <div key={day} className="p-2 text-center text-xs font-bold text-slate-600 sm:text-sm">{day}</div>)}{cells.map((day, index) => {
+    <section className="mt-6 rounded-2xl bg-white p-2 shadow-sm sm:p-6">
+      <div className="mb-5 flex items-center justify-between gap-2"><Link href={queryForMonth(prevMonth)} aria-label="Предыдущий месяц" className="rounded-lg border border-slate-400 px-3 py-2 font-semibold hover:bg-slate-100 sm:px-4">←</Link><h2 className="text-center text-base font-bold capitalize sm:text-xl">{monthTitle}</h2><Link href={queryForMonth(nextMonth)} aria-label="Следующий месяц" className="rounded-lg border border-slate-400 px-3 py-2 font-semibold hover:bg-slate-100 sm:px-4">→</Link></div>
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-2">{weekdays.map((day) => <div key={day} className="p-1 text-center text-xs font-bold text-slate-600 sm:p-2 sm:text-sm">{day}</div>)}{cells.map((day, index) => {
         if (day === null) return <div key={`empty-${index}`} aria-hidden="true" className="min-h-20 rounded-lg bg-slate-100/50 sm:min-h-28" />;
         const currentStart = new Date(Date.UTC(year, month, day));
         const currentEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
@@ -79,7 +79,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           return count + (isBusy ? 0 : 1);
         }, 0);
         const isToday = dateKey(day) === todayKey;
-        return <div key={day} className={`flex min-h-20 flex-col rounded-lg border p-2 sm:min-h-28 sm:p-3 ${isToday ? "border-blue-500 ring-2 ring-blue-500/40" : "border-slate-300"}`}><span className="text-sm font-semibold">{day}</span><span className="mt-auto text-center"><strong className="block text-2xl font-bold leading-tight sm:text-3xl">{free}</strong><span className="text-[10px] font-medium text-slate-600 sm:text-xs">свободно</span></span></div>;
+        return <div key={day} className={`flex min-h-20 min-w-0 flex-col rounded-lg border p-1 sm:min-h-28 sm:p-3 ${isToday ? "border-blue-500 ring-2 ring-blue-500/40" : "border-slate-300"}`}><span className="text-xs font-semibold sm:text-sm">{day}</span><span className="mt-auto text-center"><strong className="block text-lg font-bold leading-tight sm:text-3xl">{free}</strong><span className="sr-only text-[10px] font-medium text-slate-600 sm:not-sr-only sm:text-xs">свободно</span></span></div>;
       })}</div>
       <p className="mt-4 text-sm text-slate-600">Точек по выбранным фильтрам: {locations.length}</p>
     </section>
