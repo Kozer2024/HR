@@ -33,6 +33,7 @@ yarn-error.log*
 # secrets: commit only the sanitized template
 .env*
 !.env.example
+!.env.production.example
 
 # vercel
 .vercel

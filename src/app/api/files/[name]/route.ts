@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { storageDirectory } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
+import { isDriveStoredName, readDriveFile } from "@/lib/drive-storage";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ function contentType(name: string) {
 }
 
 function validStoredName(name: string) {
-  return path.basename(name) === name && /^[a-f0-9-]{36}(?:-[a-zA-Z0-9а-яА-Я._-]+)?\.(?:png|jpe?g|webp|gif|pdf)$/i.test(name);
+  return path.basename(name) === name && (/^[a-f0-9-]{36}(?:-[a-zA-Z0-9а-яА-Я._-]+)?\.(?:png|jpe?g|webp|gif|pdf)$/i.test(name) || isDriveStoredName(name));
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ name: string }> }) {
@@ -38,12 +39,17 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
   }
 
   try {
-    const filePath = path.join(storageDirectory, name);
-    const metadata = await stat(filePath);
-    if (!metadata.isFile() || metadata.size > 20 * 1024 * 1024) return new Response("Not found", { status: 404 });
-    const file = await readFile(filePath);
+    let file: Buffer;
+    if (isDriveStoredName(name)) {
+      file = await readDriveFile(name);
+    } else {
+      const filePath = path.join(storageDirectory, name);
+      const metadata = await stat(filePath);
+      if (!metadata.isFile() || metadata.size > 20 * 1024 * 1024) return new Response("Not found", { status: 404 });
+      file = await readFile(filePath);
+    }
     const headers = new Headers({ "Content-Type": contentType(name), "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": image ? "inline" : "attachment" });
-    return new Response(file, { headers });
+    return new Response(new Uint8Array(file), { headers });
   } catch {
     return new Response("Not found", { status: 404 });
   }

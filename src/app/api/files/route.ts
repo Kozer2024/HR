@@ -1,11 +1,9 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { storageDirectory } from "@/lib/storage";
+import { storeUploadedFile } from "@/lib/drive-storage";
 import { consumeRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { detectImage, isPdf } from "@/lib/file-signatures";
 import { isSameOriginRequest } from "@/lib/request-security";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
 import crypto from "node:crypto";
 
 export const runtime = "nodejs";
@@ -32,14 +30,12 @@ export async function POST(request: Request) {
     const pdf = isPdf(data);
     if (!image && !pdf) return Response.json({ error: "Разрешены только настоящие изображения PNG, JPEG, GIF, WebP и PDF." }, { status: 415 });
     const extension = image?.extension ?? ".pdf";
-    const storedName = `${crypto.randomUUID()}${extension}`;
+    const originalName = `${crypto.randomUUID()}${extension}`;
+    const storedName = await storeUploadedFile(originalName, data, image?.contentType ?? "application/pdf");
     const reportUrl = `/api/files/${storedName}`;
-    await mkdir(storageDirectory, { recursive: true });
-    await writeFile(path.join(/* turbopackIgnore: true */ storageDirectory, storedName), data, { flag: "wx" });
     try {
       await prisma.executionTask.update({ where: { id: task.id }, data: { status: "SUBMITTED", reportUrl } });
     } catch (error) {
-      await unlink(path.join(/* turbopackIgnore: true */ storageDirectory, storedName)).catch(() => undefined);
       throw error;
     }
     return Response.json({ url: reportUrl });

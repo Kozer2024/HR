@@ -1,8 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { storageDirectory } from "@/lib/storage";
+import { storeUploadedFile } from "@/lib/drive-storage";
 import { consumeRateLimit, rateLimitKey } from "@/lib/rate-limit";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import readXlsxFile from "read-excel-file/node";
@@ -119,7 +118,7 @@ function safePhotoArchive(buffer: Buffer) {
   const files = entries.filter((entry) => !entry.isDirectory);
   if (entries.length > 1100 || files.length > 1000) throw new Error("В ZIP допускается не более 1000 файлов.");
   let total = 0;
-  const photos = new Map<string, { extension: string; data: Buffer }>();
+  const photos = new Map<string, { extension: string; contentType: string; data: Buffer }>();
   for (const entry of files) {
     const normalized = path.posix.normalize(entry.entryName.replaceAll("\\", "/"));
     const size = entry.header.size;
@@ -129,7 +128,7 @@ function safePhotoArchive(buffer: Buffer) {
     const data = entry.getData();
     const detected = detectImage(data);
     if (!detected) throw new Error("ZIP может содержать только PNG, JPEG, GIF и WebP.");
-    photos.set(path.posix.basename(normalized), { extension: detected.extension, data });
+    photos.set(path.posix.basename(normalized), { extension: detected.extension, contentType: detected.contentType, data });
   }
   return photos;
 }
@@ -151,14 +150,18 @@ export async function POST(request: Request) {
     const rows = parsed.flatMap((row) => row.success ? [row.data] : []);
     if (String(form.get("mode") ?? "preview") === "preview" || errors.length) return Response.json({ mode: "preview", total: rows.length, rows: rows.slice(0, 200), errors });
 
-    let photos = new Map<string, { extension: string; data: Buffer }>();
+    let photos = new Map<string, { extension: string; contentType: string; data: Buffer }>();
     const zipFile = form.get("photos");
     if (zipFile instanceof File && zipFile.size > 0) {
       if (zipFile.size > MAX_ZIP_BYTES) return Response.json({ error: "ZIP фотографий превышает 30 МБ." }, { status: 400 });
       photos = safePhotoArchive(Buffer.from(await zipFile.arrayBuffer()));
     }
 
-    await mkdir(storageDirectory, { recursive: true });
+    const storedPhotos = new Map<string, string>();
+    for (const [photoName, photo] of photos) {
+      const originalName = `${crypto.randomUUID()}${photo.extension}`;
+      storedPhotos.set(photoName, await storeUploadedFile(originalName, photo.data, photo.contentType));
+    }
     let imported = 0;
     await prisma.$transaction(async (tx) => {
       for (const row of rows) {
@@ -168,10 +171,8 @@ export async function POST(request: Request) {
         const floor = await tx.floor.upsert({ where: { buildingId_number: { buildingId: building.id, number: row.floor } }, update: {}, create: { buildingId: building.id, number: row.floor } });
         const unlimited = row.capacity === "Не ограничена";
         const location = await tx.location.upsert({ where: { externalId: row.externalId }, update: { name: row.name, type: row.type, capacity: unlimited ? null : Number(row.capacity ?? 1), isUnlimitedCapacity: unlimited, description: row.description, dimensions: row.dimensions, floorId: floor.id }, create: { externalId: row.externalId, name: row.name, type: row.type, capacity: unlimited ? null : Number(row.capacity ?? 1), isUnlimitedCapacity: unlimited, description: row.description, dimensions: row.dimensions, floorId: floor.id } });
-        if (row.photo && photos.has(row.photo)) {
-          const photo = photos.get(row.photo)!;
-          const stored = `${crypto.randomUUID()}${photo.extension}`;
-          await writeFile(path.join(storageDirectory, stored), photo.data, { flag: "wx" });
+        if (row.photo && storedPhotos.has(row.photo)) {
+          const stored = storedPhotos.get(row.photo)!;
           await tx.location.update({ where: { id: location.id }, data: { photoUrls: { push: `/api/files/${stored}` } } });
         }
         imported++;
