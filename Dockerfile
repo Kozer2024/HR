@@ -2,6 +2,8 @@ FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build"
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
 RUN npm ci
 COPY . .
 RUN npm run build
