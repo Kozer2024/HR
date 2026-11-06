@@ -34,6 +34,7 @@ services:
       GDRIVE_CLIENT_SECRET: ${GDRIVE_CLIENT_SECRET:-}
       GDRIVE_REFRESH_TOKEN: ${GDRIVE_REFRESH_TOKEN:-}
       FILE_STORAGE_PATH: /app/storage
+      COLLECTOR_TOKEN: ${COLLECTOR_TOKEN:?Set COLLECTOR_TOKEN in .env.production}
     volumes:
       - uploads_data:/app/storage
     depends_on:
